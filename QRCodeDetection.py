@@ -74,7 +74,68 @@ def writeGreyscalePixelArraytoPNG(output_filename, pixel_array, image_width, ima
     writer.write(file, pixel_array)
     file.close()
 
+# EXTRA CODE
 
+def computeRGBToSingleGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
+    
+    greyscale_pixel_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for row in range(image_height):
+        for column in range(image_width):
+            greyscale_pixel_array[row][column] = round(0.299 * pixel_array_r[row][column] + 0.587 * pixel_array_g[row][column] + 0.114 * pixel_array_b[row][column])
+    
+    return greyscale_pixel_array
+
+# unused
+def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
+    
+    pixel_array_r2 = createInitializedGreyscalePixelArray(image_width, image_height)
+    pixel_array_g2 = createInitializedGreyscalePixelArray(image_width, image_height)
+    pixel_array_b2 = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for row in range(image_height):
+        for column in range(image_width):
+            # greyscale_pixel_array[row][column] = round(0.299 * pixel_array_r[row][column] + 0.587 * pixel_array_g[row][column] + 0.114 * pixel_array_b[row][column])
+            pixel_array_r2[row][column] = 0.299 * pixel_array_r[row][column]
+            pixel_array_g2[row][column] = 0.587 * pixel_array_g[row][column]
+            pixel_array_b2[row][column] = 0.114 * pixel_array_b[row][column]
+    
+    return (pixel_array_r2, pixel_array_g2, pixel_array_b2)
+
+
+# contrast stretching
+def computeMinAndMaxValues(pixel_array, image_width, image_height):
+    if image_width > 0 and image_height > 0:
+        pMin = pixel_array[0][0]
+        pMax = pixel_array[0][0]
+    else:
+        return [0,0]
+    
+    for y in range(image_height):
+        for x in range(image_width):
+            c_val = pixel_array[y][x]
+            if c_val > pMax:
+                pMax = c_val
+            elif c_val < pMin:
+                pMin = c_val
+            
+    return [pMin,pMax]
+    
+
+def scaleTo0And255AndQuantize(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    minMax = computeMinAndMaxValues(pixel_array, image_width, image_height)
+    
+    #print(minMax)
+    
+    if minMax[0] == minMax[1]:
+        return tmp
+    
+    for y in range(image_height):
+        for x in range(image_width):
+            tmp[y][x] = round(((pixel_array[y][x] - minMax[0]) * (255/(minMax[1]-minMax[0]))))
+    
+    return tmp
 
 def main():
     filename = "./images/covid19QRCode/poster1small.png"
@@ -83,7 +144,11 @@ def main():
     # each pixel array contains 8 bit integer values between 0 and 255 encoding the color values
     (image_width, image_height, px_array_r, px_array_g, px_array_b) = readRGBImageToSeparatePixelArrays(filename)
 
-    pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
+    pixel_array = computeRGBToSingleGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
+    scaled_pixel_array = scaleTo0And255AndQuantize(pixel_array, image_width, image_height)
+
+    #pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
+    pyplot.imshow(scaled_pixel_array, cmap='gray')
 
     # get access to the current pyplot figure
     axes = pyplot.gca()
