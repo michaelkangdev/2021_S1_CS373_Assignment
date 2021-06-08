@@ -1,6 +1,10 @@
 
 from matplotlib import pyplot
 from matplotlib.patches import Rectangle
+from numpy import mod
+
+from pyzbar.pyzbar import decode
+from PIL import Image
 
 import imageIO.png
 
@@ -300,8 +304,9 @@ def keyWithMaxVal(d):
      return k[v.index(max(v))]
 
 def main():
-    filename = "./images/covid19QRCode/poster1small.png"
-    # filename = "./images/covid19QRCode/challenging/connecticut.png"
+    # filename = "./images/covid19QRCode/poster1small.png"
+
+    filename = "./images/covid19QRCode/challenging/bch.png"
 
     # we read in the png file, and receive three pixel arrays for red, green and blue components, respectively
     # each pixel array contains 8 bit integer values between 0 and 255 encoding the color values
@@ -343,7 +348,7 @@ def main():
     
     (ccimg,ccsizes) = computeConnectedComponentLabeling(eroded_array2,image_width,image_height)
     largest_key = keyWithMaxVal(ccsizes)
-    print("largest key: " + str(largest_key))
+    # print("largest key: " + str(largest_key))
 
     largest_cc_array = createInitializedGreyscalePixelArray(image_width,image_height)
 
@@ -352,7 +357,7 @@ def main():
             if ccimg[y][x] == largest_key:
                 largest_cc_array[y][x] = 70
 
-    # corners
+    # corners of bounding box
 
     min_y = image_height
     min_x = image_width
@@ -374,13 +379,32 @@ def main():
                 if x > max_x:
                     max_x = x
 
-    # Display
-    pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
-    # Debugging
-    print("label: nr_pixels")
-    for sz in ccsizes.keys():
-        print("{}: {}".format(sz, ccsizes[sz]))
+    # EXTENSION
 
+    # Create white pixel array
+    qr_output = createInitializedGreyscalePixelArray(image_width, image_height, 255)
+
+    # Extract qr code from the greyscale array
+    for y in range(min_y, max_y):
+        for x in range(min_x, max_x):
+            qr_output[y][x] = pixel_array[y][x]
+    
+    # Output the extracted image
+    writeGreyscalePixelArraytoPNG("output.png", qr_output, image_width, image_height)
+
+    # Decode the outputted qr code
+    qr_info = decode(Image.open('output.png'))
+    qr_data = str(qr_info[0].data)[2:-1]
+
+    # Display the qr data
+    print("QR Code Data: " + str(qr_info[0].data)[2:-1])
+
+    pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
+    
+    # Debugging
+    #print("label: nr_pixels")
+    #for sz in ccsizes.keys():
+    #    print("{}: {}".format(sz, ccsizes[sz]))
     # pyplot.imshow(largest_cc_array, cmap='gray')
 
     # get access to the current pyplot figure
@@ -393,8 +417,6 @@ def main():
 
     # plot the current figure
     pyplot.show()
-
-
 
 if __name__ == "__main__":
     main()
