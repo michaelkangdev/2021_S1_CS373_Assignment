@@ -10,6 +10,21 @@ def createInitializedGreyscalePixelArray(image_width, image_height, initValue = 
     new_array = [[initValue for x in range(image_width)] for y in range(image_height)]
     return new_array
 
+class Queue:
+    def __init__(self):
+        self.items = []
+
+    def isEmpty(self):
+        return self.items == []
+
+    def enqueue(self, item):
+        self.items.insert(0,item)
+
+    def dequeue(self):
+        return self.items.pop()
+
+    def size(self):
+        return len(self.items)
 
 # this function reads an RGB color png file and returns width, height, as well as pixel arrays for r,g,b
 def readRGBImageToSeparatePixelArrays(input_filename):
@@ -175,8 +190,118 @@ def computeBoxAveraging3x3(pixel_array, image_width, image_height):
             
     return tmp
 
+def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for y in range(image_height):
+        for x in range(image_width):
+            if pixel_array[y][x] < threshold_value:
+                tmp[y][x] = 0
+            else:
+                tmp[y][x] = 255
+                
+    
+    return tmp
+
+def computeErosion8Nbh3x3FlatSE(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for y in range(image_height):
+        for x in range(image_width):
+            if y == 0 or y == (image_height - 1) or x == 0 or x == (image_width - 1):
+                #tmp[y][x] = 0
+                pass
+            elif pixel_array[y][x] > 0:
+                t1 = [pixel_array[y-1][x-1], pixel_array[y-1][x], pixel_array[y-1][x+1]]
+                t2 = [pixel_array[y][x-1], pixel_array[y][x+1]]
+                t3 = [pixel_array[y+1][x-1], pixel_array[y+1][x], pixel_array[y+1][x+1]]
+                #total = t1 + t2 + t3
+                if 0 not in t1 and 0 not in t2 and 0 not in t3:
+                    tmp[y][x] = 1
+                    
+    return tmp
+
+def computeDilation8Nbh3x3FlatSE(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for y in range(image_height):
+        for x in range(image_width):
+            grid = [[y,x]]
+            grid.append([y-1,x-1])
+            grid.append([y-1,x])
+            grid.append([y-1,x+1])
+            grid.append([y,x-1])
+            grid.append([y,x+1])
+            grid.append([y+1,x-1])
+            grid.append([y+1,x])
+            grid.append([y+1,x+1])
+            
+            for coord in grid:
+                if coord[0] < 0 or coord[1] < 0 or coord[0] > (image_height - 1) or coord[1] > (image_width - 1):
+                    pass
+                elif pixel_array[coord[0]][coord[1]] >= 1:
+                    tmp[y][x] = 1
+
+                    
+    return tmp
+
+def computeConnectedComponentLabeling(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    label = 1
+    label_dict = {}
+    q = Queue()
+    
+    for y in range(image_height):
+        for x in range(image_width):
+            if pixel_array[y][x] == 0 or tmp[y][x] != 0:
+                pass
+            else:
+                q.enqueue([y,x])
+                label_dict[label] = 0
+                while q.size() > 0:
+                    c = q.dequeue()
+                    tmp[c[0]][c[1]] = label
+                    label_dict[label] += 1
+                    
+                    # left
+                    if c[1] > 0:
+                        if pixel_array[c[0]][c[1]-1] > 0 and tmp[c[0]][c[1]-1] == 0: 
+                            q.enqueue([c[0],c[1]-1])
+                            tmp[c[0]][c[1]-1] = -1
+                        
+                    # right    
+                    if c[1] < image_width - 1:
+                        if pixel_array[c[0]][c[1] + 1] > 0 and tmp[c[0]][c[1] + 1] == 0: 
+                            q.enqueue([c[0],c[1]+1])
+                            tmp[c[0]][c[1] + 1] = -1
+                        
+                    # top 
+                    if c[0] > 0:
+                        if pixel_array[c[0]-1][c[1]] > 0 and tmp[c[0]-1][c[1]] == 0: 
+                            q.enqueue([c[0]-1,c[1]])
+                            tmp[c[0]-1][c[1]] = -1
+                        
+                    # bottom
+                    if c[0] < image_height - 1:
+                        if pixel_array[c[0]+1][c[1]] > 0 and tmp[c[0]+1][c[1]] == 0: 
+                            q.enqueue([c[0]+1,c[1]])
+                            tmp[c[0]+1][c[1]] = -1
+                            
+                label += 1
+            
+    return tmp, label_dict
+
+# borrowed from stackoverflow LOL!
+def keyWithMaxVal(d):
+     """ a) create a list of the dict's keys and values; 
+         b) return the key with the max value"""  
+     v=list(d.values())
+     k=list(d.keys())
+     return k[v.index(max(v))]
+
 def main():
     filename = "./images/covid19QRCode/poster1small.png"
+    # filename = "./images/covid19QRCode/challenging/connecticut.png"
 
     # we read in the png file, and receive three pixel arrays for red, green and blue components, respectively
     # each pixel array contains 8 bit integer values between 0 and 255 encoding the color values
@@ -200,15 +325,69 @@ def main():
     mean_array = computeBoxAveraging3x3(combined, image_width, image_height)
     for i in range(6):
         mean_array = computeBoxAveraging3x3(mean_array, image_width, image_height)
+    
+    # Contrast Streching
+    scaled_pixel_array2 = scaleTo0And255AndQuantize(mean_array, image_width, image_height)
 
-    #pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
-    # Display the image
-    pyplot.imshow(mean_array, cmap='gray')
+    # Threshold operation
+    threshold_array = computeThresholdGE(scaled_pixel_array2, 70, image_width, image_height)
+
+    # Closing
+    dialated_array = computeDilation8Nbh3x3FlatSE(threshold_array,image_width, image_height)
+    dialated_array2 = computeDilation8Nbh3x3FlatSE(dialated_array,image_width, image_height)
+
+    eroded_array = computeErosion8Nbh3x3FlatSE(dialated_array2,image_width, image_height)
+    eroded_array2 = computeErosion8Nbh3x3FlatSE(eroded_array,image_width, image_height)
+    
+    # CC
+    
+    (ccimg,ccsizes) = computeConnectedComponentLabeling(eroded_array2,image_width,image_height)
+    largest_key = keyWithMaxVal(ccsizes)
+    print("largest key: " + str(largest_key))
+
+    largest_cc_array = createInitializedGreyscalePixelArray(image_width,image_height)
+
+    for y in range(image_height):
+        for x in range(image_width):
+            if ccimg[y][x] == largest_key:
+                largest_cc_array[y][x] = 70
+
+    # corners
+
+    min_y = image_height
+    min_x = image_width
+    max_y = 0
+    max_x = 0
+
+    for y in range(image_height):
+        for x in range(image_width):
+            if largest_cc_array[y][x] != 0:
+                if y < min_y:
+                    min_y = y
+                
+                if x < min_x:
+                    min_x = x
+                
+                if y > max_y:
+                    max_y = y
+                
+                if x > max_x:
+                    max_x = x
+
+    # Display
+    pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
+    # Debugging
+    print("label: nr_pixels")
+    for sz in ccsizes.keys():
+        print("{}: {}".format(sz, ccsizes[sz]))
+
+    # pyplot.imshow(largest_cc_array, cmap='gray')
 
     # get access to the current pyplot figure
     axes = pyplot.gca()
     # create a 70x50 rectangle that starts at location 10,30, with a line width of 3
-    rect = Rectangle( (10, 30), 70, 50, linewidth=3, edgecolor='g', facecolor='none' )
+    # rect = Rectangle( (10, 30), 70, 50, linewidth=3, edgecolor='g', facecolor='none' )
+    rect = Rectangle( (min_x, min_y), max_x - min_x, max_y - min_y, linewidth=3, edgecolor='g', facecolor='none' )
     # paint the rectangle over the current plot
     axes.add_patch(rect)
 
