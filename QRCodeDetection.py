@@ -137,6 +137,44 @@ def scaleTo0And255AndQuantize(pixel_array, image_width, image_height):
     
     return tmp
 
+def computeVerticalEdgesSobelAbsolute(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for y in range(1,image_height-1):
+        for x in range(1,image_width-1):
+            left = pixel_array[y-1][x-1] + (2 * pixel_array[y][x-1]) + pixel_array[y+1][x-1]
+            right = pixel_array[y-1][x+1] + (2 * pixel_array[y][x+1]) + pixel_array[y+1][x+1]
+            val = (right - left)/8
+            tmp[y][x] = abs(val)
+            
+    return tmp
+
+def computeHorizontalEdgesSobelAbsolute(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for y in range(1,image_height-1):
+        for x in range(1,image_width-1):
+            top = pixel_array[y-1][x-1] + (2 * pixel_array[y-1][x]) + pixel_array[y-1][x+1]
+            bot = pixel_array[y+1][x-1] + (2 * pixel_array[y+1][x]) + pixel_array[y+1][x+1]
+            
+            val = (top - bot)/8
+            tmp[y][x] = abs(val)
+            
+    return tmp
+
+def computeBoxAveraging3x3(pixel_array, image_width, image_height):
+    tmp = createInitializedGreyscalePixelArray(image_width, image_height)
+    
+    for y in range(1,image_height-1):
+        for x in range(1,image_width-1):
+            top = pixel_array[y-1][x-1] + pixel_array[y-1][x] + pixel_array[y-1][x+1]
+            bot = pixel_array[y+1][x-1] + pixel_array[y+1][x] + pixel_array[y+1][x+1]
+            lr = pixel_array[y][x-1] + pixel_array[y][x] + pixel_array[y][x+1]
+            val = (top + bot + lr)/9
+            tmp[y][x] = val
+            
+    return tmp
+
 def main():
     filename = "./images/covid19QRCode/poster1small.png"
 
@@ -144,11 +182,28 @@ def main():
     # each pixel array contains 8 bit integer values between 0 and 255 encoding the color values
     (image_width, image_height, px_array_r, px_array_g, px_array_b) = readRGBImageToSeparatePixelArrays(filename)
 
+    # Convert to grayscale
     pixel_array = computeRGBToSingleGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
+
+    # Contrast Streching
     scaled_pixel_array = scaleTo0And255AndQuantize(pixel_array, image_width, image_height)
+    
+    # Edge computataion
+    vertical_edges_array = computeVerticalEdgesSobelAbsolute(scaled_pixel_array, image_width, image_height)
+    horizontal_edges_array = computeHorizontalEdgesSobelAbsolute(scaled_pixel_array, image_width, image_height)
+    combined = createInitializedGreyscalePixelArray(image_width, image_height)
+    for y in range(image_height):
+        for x in range(image_width):
+            combined[y][x] = vertical_edges_array[y][x] + horizontal_edges_array[y][x]
+
+    # Smoothing
+    mean_array = computeBoxAveraging3x3(combined, image_width, image_height)
+    for i in range(6):
+        mean_array = computeBoxAveraging3x3(mean_array, image_width, image_height)
 
     #pyplot.imshow(prepareRGBImageForImshowFromIndividualArrays(px_array_r, px_array_g, px_array_b, image_width, image_height))
-    pyplot.imshow(scaled_pixel_array, cmap='gray')
+    # Display the image
+    pyplot.imshow(mean_array, cmap='gray')
 
     # get access to the current pyplot figure
     axes = pyplot.gca()
