@@ -304,9 +304,10 @@ def keyWithMaxVal(d):
      return k[v.index(max(v))]
 
 def main():
-    # filename = "./images/covid19QRCode/poster1small.png"
 
-    filename = "./images/covid19QRCode/challenging/bch.png"
+    # Input file 
+    filename = "./images/covid19QRCode/poster1small.png"
+    # filename = "./images/covid19QRCode/challenging/bch.png"
 
     # we read in the png file, and receive three pixel arrays for red, green and blue components, respectively
     # each pixel array contains 8 bit integer values between 0 and 255 encoding the color values
